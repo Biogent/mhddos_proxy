@@ -363,13 +363,15 @@ async def run_ddos(args):
 IS_AUTO_MH = os.getenv('AUTO_MH')
 IS_DOCKER = os.getenv('IS_DOCKER')
 
-
-def _main_signal_handler(ps, *args):
-    if not IS_AUTO_MH:
-        logger.info(f"{cl.BLUE}{t('Shutting down...')}{cl.RESET}")
-    for p in ps:
-        if p.is_alive():
-            p.terminate()
+def _worker_signal_handler(loop, *args):
+    tasks = asyncio.all_tasks(loop)
+    for task in tasks:
+        if not task.cancelled():
+            task.cancel()
+    time.sleep(2)
+    loop.shutdown_default_executor()
+    if loop.is_running():
+        loop.close()
 
 
 def _worker_process(args, lang: str, process_index: Optional[Tuple[int, int]]):
@@ -379,9 +381,19 @@ def _worker_process(args, lang: str, process_index: Optional[Tuple[int, int]]):
         set_language(lang)  # set language again for the subprocess
         setup_worker_logger(process_index)
         loop = setup_event_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            signal.signal(sig, partial(_worker_signal_handler, loop))
         loop.run_until_complete(run_ddos(args))
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, asyncio.CancelledError):
         sys.exit()
+
+
+def _main_signal_handler(ps, *args):
+    if not IS_AUTO_MH:
+        logger.info(f"{cl.BLUE}{t('Shutting down...')}{cl.RESET}")
+    for p in ps:
+        if p.is_alive():
+            p.terminate()
 
 
 def main():
@@ -427,8 +439,8 @@ def main():
         p = mp.Process(target=_worker_process, args=(args, lang, pos), daemon=True)
         processes.append(p)
 
-    signal.signal(signal.SIGINT, partial(_main_signal_handler, processes, logger))
-    signal.signal(signal.SIGTERM, partial(_main_signal_handler, processes, logger))
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, partial(_main_signal_handler, processes, logger))
 
     for p in processes:
         p.start()
