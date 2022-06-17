@@ -396,7 +396,7 @@ def main():
         logger.error(f"{cl.RED}{t('No targets specified for the attack')}{cl.RESET}")
         sys.exit()
 
-    max_copies = max(1, CPU_COUNT // CPU_PER_COPY)
+    max_copies = 10 # alternative is -> max(1, CPU_COUNT // CPU_PER_COPY)
     num_copies = args.copies
     if args.copies == COPIES_AUTO:
         num_copies = min(max_copies, MAX_COPIES_AUTO)
