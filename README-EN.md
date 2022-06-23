@@ -8,10 +8,9 @@
 - Effective utilization of your resources due to the asynchronous architecture
 
 ### ⏱ Recent updates
+- **22.06.2022** Performance improvements. The `--debug` option is deprecated to avoid negative impact on performance
 - **10.06.2022** Introduced `--proxy` option for providing custom proxies directly from command args
 - **08.06.2022** Added `--copies auto` option to set the value automatically based on the resources available
-- **25.05.2022** Improved default output - the `--debug` option is no longer required 
-- **24.05.2022** Added auto-update option - see [Running](#2--running)
 
 ### 1. 💽 Installation
 
@@ -35,6 +34,10 @@ Install and start Docker: https://docs.docker.com/desktop/#download-and-install
 
     ./runner.sh python3 https://example.com tcp://198.18.0.123:5678
 
+For [**Termux for Android**](https://telegra.ph/mhddos-proxy-for-Android-with-Termux-03-31) use:
+
+    TERMUX=1 bash runner.sh python https://example.com tcp://198.18.0.123:5678 -t 1000
+
 #### Python (manual updates required) (if it doesn't work, try `python` or `python3.10` instead of `python3`)
 
     python3 runner.py https://example.com tcp://198.18.0.123:5678
@@ -52,22 +55,18 @@ All options can be combined, you can specify them either before and after the li
 - Number of threads: `-t XXXX` - the default is 8000 (or 4000 if the machine has only one CPU).
 - Number of copies: `--copies X` or `--copies auto` - in case you have 4+ CPU and stable network 100+ Mb/s
 
-### 4. 📌 Help with finding new proxies for mhddos_proxy
-The script itself and installation instructions are here: https://github.com/porthole-ascend-cinnamon/proxy_finder
-
-### 5. 🐳 Community (mostly in Ukrainian)
+### 4. 🐳 Community (mostly in Ukrainian)
 - [Create a botnet of 30+ free and standalone Linux servers](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
 - [Detailed analysis of mhddos_proxy and installation instructions](docs/installation.md)
 - [Analysis of mhddos_proxy](https://telegra.ph/Anal%D1%96z-zasobu-mhddos-proxy-04-01)
 - [Example of running via docker on OpenWRT](https://youtu.be/MlL6fuDcWlI)
 - [VPN](https://auto-ddos.notion.site/VPN-5e45e0aadccc449e83fea45d56385b54)
 
-### 6. CLI
+### 5. CLI
 
     usage: runner.py target [target ...]
                      [-t THREADS] 
                      [-c URL]
-                     [--debug]
                      [--vpn]
                      [--http-methods METHOD [METHOD ...]]
                      [--itarmy]
@@ -84,12 +83,11 @@ The script itself and installation instructions are here: https://github.com/por
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
       --proxy [PROXY ...]    List of proxies to use, separated by spaces
       --http-methods GET     List of HTTP(L7) methods to use (default is GET).
-      --debug                Detailed log for each target
       --itarmy               Attack targets from https://t.me/itarmyofukraine2022  
       --copies 1             Number of copies to run (default is 1). Use "auto" to set the value automatically
       --lang {en,ua}         Select language (default is ua)
 
-### 7. Custom proxies
+### 6. Custom proxies
 
 #### CLI
 
