@@ -1,3 +1,5 @@
+- **22.06.2022** 
+  - Performance improvements. The `--debug` option is deprecated to avoid negative impact on performance
 - **10.06.2022** 
   - Introduced `--proxy` option for providing custom proxies directly from command args
 - **08.06.2020**
@@ -5,7 +7,7 @@
 - **25.05.2022**
   - Improved default output - the `--debug` option is no longer required 
 - **21.05.2022**
-  - Added english localization - use flag `--lang EN` (more languages may be added later)
+  - Added english localization - use flag `--lang en` (more languages may be added later)
 - **18.05.2022**
   - Added `--copies` option in order to run multiple copies (recommended for use with 4+ CPUs and network > 100 Mb / s).
 - **15.05.2022**
